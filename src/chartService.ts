@@ -1,7 +1,43 @@
-const { JSDOM } = require('jsdom');
+import { createCanvas } from "canvas";
 import { createChart, HorzAlign, LineStyle, Time, VertAlign } from 'lightweight-charts';
+const { JSDOM } = require('jsdom');
+const sharp = require('sharp');
 import { OHLCV } from '../types';
-import { CHART_BACKGROUND_COLOR, CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_PADDING_RIGHT, CHART_RIGHT_PANEL_WIDTH, CHART_TEXT_COLOR, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, WATER_MARK_FONT_FAMILY, WATER_MARK_TITLE } from './consts';
+
+const Consts = {
+  WATER_MARK_TITLE: "ZZZ",
+  WATER_MARK_FONT_FAMILY: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif",
+  
+  PRIMARY_CHART_HEIGHT: 600,
+  RSI_CHART_HEIGHT: 100,
+  MACD_CHART_HEIGHT: 100,
+  CHART_WIDTH: 1200,
+  CHART_PADDING_HEIGHT: 12,
+  CHART_PADDING_LEFT: 20,
+  CHART_PADDING_RIGHT: 4,
+  CHART_ITEM_GAP: 4,
+  
+  CHART_RIGHT_PANEL_WIDTH: 70,
+  
+  TITLE_FONT_SIZE: 12,
+  TITLE_FONT_FAMILY: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif",
+  TITLE_FONT_COLOR: '#787B86',
+  TITLE_VALUE_FONT_COLOR: '#ef5350',
+  
+  CHART_BACKGROUND_COLOR: '#131722',
+  CHART_TEXT_COLOR: '#d1d4dc',
+};
+
+const totalWidth = Consts.CHART_WIDTH;
+const totalHeight = Consts.PRIMARY_CHART_HEIGHT + Consts.RSI_CHART_HEIGHT + Consts.MACD_CHART_HEIGHT;
+
+const chartWidth = totalWidth - Consts.CHART_PADDING_LEFT - Consts.CHART_PADDING_RIGHT;
+
+const tops = [
+  Consts.CHART_PADDING_HEIGHT, 
+  Consts.PRIMARY_CHART_HEIGHT + (Consts.CHART_ITEM_GAP / 2), 
+  Consts.PRIMARY_CHART_HEIGHT + Consts.RSI_CHART_HEIGHT + (Consts.CHART_ITEM_GAP / 2)
+];
 
 export const getChatData = (data: OHLCV[]) => {
   // Sort and map incoming data
@@ -149,7 +185,7 @@ export const getChatData = (data: OHLCV[]) => {
 };
 
 export class ChartService {
-  async generateChart(data: OHLCV[], width: number, height: number) {
+  async generateChart(data: OHLCV[]) {
     try {
       const setSystemConfigure = (dom: any) => {
         const window = global.window = dom.window;
@@ -217,8 +253,8 @@ export class ChartService {
       const getChartConfig = () => (
         {
           layout: {
-            background: { color: CHART_BACKGROUND_COLOR },
-            textColor: CHART_TEXT_COLOR,
+            background: { color: Consts.CHART_BACKGROUND_COLOR },
+            textColor: Consts.CHART_TEXT_COLOR,
           },
           grid: {
             vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
@@ -243,13 +279,13 @@ export class ChartService {
 
       const getChartWaterMark = () => (
         {
-          text: WATER_MARK_TITLE,
+          text: Consts.WATER_MARK_TITLE,
           visible: true,
           fontSize: 48,
           horzAlign: 'center' as HorzAlign,
           vertAlign: 'center' as VertAlign,
           color: 'rgba(255, 255, 255, 0.1)',
-          fontFamily: WATER_MARK_FONT_FAMILY,
+          fontFamily: Consts.WATER_MARK_FONT_FAMILY,
         }
       );
 
@@ -259,7 +295,7 @@ export class ChartService {
       };
 
       const chartData = getChatData(data);
-      const dom = createDom(height);
+      const dom = createDom(totalHeight);
       setSystemConfigure(dom);
 
       console.log("Created dom and set configuration");
@@ -276,13 +312,13 @@ export class ChartService {
         chartElement, 
         {
           ...getChartConfig(),
-          width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
-          height: PRIMARY_CHART_HEIGHT - CHART_PADDING_HEIGHT - (CHART_ITEM_GAP / 2), 
+          width: chartWidth,
+          height: Consts.PRIMARY_CHART_HEIGHT - Consts.CHART_PADDING_HEIGHT - (Consts.CHART_ITEM_GAP / 2), 
           watermark: getChartWaterMark(),
           rightPriceScale: {
             ...getChartConfig().rightPriceScale,
             // precision: 6,
-            minimumWidth: CHART_RIGHT_PANEL_WIDTH,
+            minimumWidth: Consts.CHART_RIGHT_PANEL_WIDTH,
             mode: 0,
             autoScale: true,
             scaleMargins: {
@@ -324,11 +360,11 @@ export class ChartService {
       console.log("Ready to draw RSI chart");
       const rsiChart = createChart(rsiElement, {
         ...getChartConfig(),
-        width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
-        height: RSI_CHART_HEIGHT - CHART_ITEM_GAP,
+        width: chartWidth,
+        height: Consts.RSI_CHART_HEIGHT - Consts.CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
-          minimumWidth: CHART_RIGHT_PANEL_WIDTH,
+          minimumWidth: Consts.CHART_RIGHT_PANEL_WIDTH,
           scaleMargins: {
             top: 0.1,
             bottom: 0.1,
@@ -356,11 +392,11 @@ export class ChartService {
       console.log("Ready to draw MACD chart");
       const macdChart = createChart(macdElement, {
         ...getChartConfig(),
-        width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
-        height: MACD_CHART_HEIGHT - CHART_ITEM_GAP,
+        width: chartWidth,
+        height: Consts.MACD_CHART_HEIGHT - Consts.CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
-          minimumWidth: CHART_RIGHT_PANEL_WIDTH,
+          minimumWidth: Consts.CHART_RIGHT_PANEL_WIDTH,
           scaleMargins: {
             top: 0.3,
             bottom: 0.25,
@@ -420,6 +456,95 @@ export class ChartService {
       throw e;
     } finally {
       // if (dom) await dom.close();
+    }
+  }
+
+  async addTextToImage(baseImageBuffer: any, chartData: any, tokenName: string, timeFrame: string, options: any) {
+    const {
+      width = Consts.CHART_WIDTH,
+      height = Consts.PRIMARY_CHART_HEIGHT + Consts.RSI_CHART_HEIGHT + Consts.MACD_CHART_HEIGHT,
+      fontSize = Consts.TITLE_FONT_SIZE,
+      fontColor = Consts.TITLE_FONT_COLOR,
+      textX = Consts.CHART_PADDING_LEFT + 12,
+      textY = 20,
+      fontFamily = Consts.TITLE_FONT_FAMILY,
+    } = options;
+
+    const textYs = [tops[0] + textY, tops[1] + textY, tops[2] + textY];
+    const texts = [
+      `${tokenName} · ${timeFrame}, GMGN.AI`,
+      'RSI (14)',
+      'MACD (12, 26, 9)',
+    ];
+    const lastChatData = chartData[chartData.length-1];
+    const valueLabels = ['O:', 'H:', 'L:', 'C:'];
+    const valueTexts = [lastChatData.open.toFixed(8), lastChatData.high.toFixed(8), lastChatData.low.toFixed(8), lastChatData.close.toFixed(8)];
+  
+    // Create a canvas to draw the text
+    const canvas = createCanvas(width, height);
+    const context = canvas.getContext('2d');
+  
+    // Set background color to transparent
+    context.fillStyle = 'rgba(0, 0, 0, 0)';
+    context.fillRect(0, 0, width, height);
+  
+    context.font = `${fontSize}px ${fontFamily}`;
+
+    for (let i = 0; i < texts.length; i ++) {
+      context.fillStyle = fontColor;
+      context.fillText(texts[i], textX, textYs[i]);
+    }
+
+    context.fillStyle = 'rgba(128, 84, 196, 0.1)';
+    context.fillRect(
+      Consts.CHART_PADDING_LEFT, 
+      tops[1] + 18, 
+      Consts.CHART_WIDTH - Consts.CHART_PADDING_LEFT - Consts.CHART_PADDING_RIGHT - Consts.CHART_RIGHT_PANEL_WIDTH, 
+      33
+    );
+
+    const startX = 112;
+    const gap = 16;
+    const valueWidth = 84;
+
+    for (let i = 0; i < valueLabels.length; i ++) {
+      context.fillStyle = fontColor;
+      context.fillText(valueLabels[i], textX + startX + (valueWidth * i), textYs[0]);
+      context.fillStyle = Consts.TITLE_VALUE_FONT_COLOR;
+      context.fillText(valueTexts[i], textX + startX + gap + (valueWidth * i), textYs[0]);
+    }
+
+    // Convert the canvas to a buffer
+    const textOverlayBuffer = canvas.toBuffer('image/png');
+  
+    // Combine the base image and the text overlay
+    const finalImage = await sharp(await baseImageBuffer.png().toBuffer())
+      .composite([{ input: textOverlayBuffer, blend: 'over' }])
+      .png()
+      .toBuffer();
+  
+    return finalImage;
+  }
+
+  async combineImagesVertically(imagePaths: any) {
+    try {
+      // Combine images vertically
+      return await sharp({
+        create: {
+          width: totalWidth,  // Set the width you want for the combined image
+          height: totalHeight,  // Total height (sum of all chart heights)
+          channels: 3,  // RGBA
+          background: { r: 19, g: 23, b: 34 }
+        }
+      })
+      .composite(imagePaths.map((img: any, i: number) => ({
+        input: img,
+        top: tops[i],  // Position each image vertically (adjust as needed)
+        left: Consts.CHART_PADDING_LEFT,
+      })));
+      // .toFile(outputPath);  // Save the combined image
+    } catch (err) {
+      console.error('Error combining images:', err);
     }
   }
 }
