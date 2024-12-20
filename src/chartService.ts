@@ -44,7 +44,7 @@ export const getChatData = (data: OHLCV[]) => {
   const chartData = data
     .sort((a, b) => a.timestamp - b.timestamp)
     .map(item => ({
-      time: item.timestamp as Time,  // Ensure this is a valid time (UTCTimestamp)
+      time: item.timestamp as Time,
       open: Number(item.open),
       high: Number(item.high),
       low: Number(item.low),
@@ -110,9 +110,6 @@ export const getChatData = (data: OHLCV[]) => {
     }
 
     const signalLine = ema(macdLine.slice(slowPeriod - fastPeriod), signalPeriod); 
-    // Adjust indices if needed
-    // macdLine starts at index (slowPeriod - 1)
-    // We'll consider data from slowPeriod-1 to end for MACD
 
     const start = slowPeriod - 1; // first MACD value index in original data
     const macdData: { time: Time; value: number }[] = [];
@@ -144,7 +141,6 @@ export const getChatData = (data: OHLCV[]) => {
 
   // Convert RSI, MACD, Signal, Histogram into maps for quick lookup
   const rsiMap = new Map(rsiData.map(d => [d.time, d.value]));
-
   const macdMap = new Map(macdResults.macdData.map(d => [d.time, d.value]));
   const signalMap = new Map(macdResults.signalData.map(d => [d.time, d.value]));
   const histMap = new Map(macdResults.histogramData.map(d => [d.time, { value: d.value, color: d.color }]));
@@ -222,14 +218,14 @@ export class ChartService {
           vendorSub: "",
           webdriver: false,
           deviceMemory: 8,
-        } as unknown as Navigator; // Cast it as Navigator to satisfy TypeScript
+        } as unknown as Navigator; 
         globalThis.location = window.location;
         
         window.matchMedia = (str: string) => {
           const ddpx = str.split('all and (resolution: ')[1].split('dppx)')[0];
           return {
             matches: true,
-            media: 'all and (resolution: '+ ddpx +'dppx)',
+            media: 'all and (resolution: ' + ddpx + 'dppx)',
             addListener: () => {},
           };
         }
@@ -242,16 +238,13 @@ export class ChartService {
           `
             <!DOCTYPE html>
             <div style="height: ${height}px;" id="ChatContainer">
-              <div id="price_chart" class="chart-section">
-              </div>
-              <div id="rsi_chart" class="chart-section">
-              </div>
-              <div id="macd_chart" class="chart-section">
-              </div>
+              <div id="price_chart" class="chart-section"></div>
+              <div id="rsi_chart" class="chart-section"></div>
+              <div id="macd_chart" class="chart-section"></div>
             </div>
-          `, 
+          `,
           {
-            pretendToBeVisual: true, 
+            pretendToBeVisual: true,
             url: "http://localhost/",
           }
         );
@@ -297,15 +290,13 @@ export class ChartService {
       );
 
       const base64ToBuffer = (base64String: string) => {
-        const base64Data = base64String.replace(/^data:image\/png;base64,/, '');  // Remove prefix if present
+        const base64Data = base64String.replace(/^data:image\/png;base64,/, '');
         return Buffer.from(base64Data, 'base64');
       };
 
       const chartData = getChatData(data);
       const dom = createDom(totalHeight);
       setSystemConfigure(dom);
-
-      console.log("Created dom and set configuration");
 
       const containerElement = document.getElementById('ChatContainer');
       const chartElement = document.getElementById('price_chart');
@@ -314,7 +305,7 @@ export class ChartService {
 
       if (!containerElement || !chartElement || !rsiElement || !macdElement) return "";
 
-      console.log("Ready to draw main chart");
+      // Primary (Price) Chart
       const primaryChart = createChart(
         chartElement, 
         {
@@ -324,7 +315,6 @@ export class ChartService {
           watermark: getChartWaterMark(),
           rightPriceScale: {
             ...getChartConfig().rightPriceScale,
-            // precision: 6,
             minimumWidth: Consts.CHART_RIGHT_PANEL_WIDTH,
             mode: 0,
             autoScale: true,
@@ -332,18 +322,17 @@ export class ChartService {
               top: 0.1,
               bottom: 0.1,
             },
-            // format: (price: number) => price.toFixed(6),
           },
           localization: { locale: 'en-US' },
         }
       );
 
       const mainSeries = primaryChart.addCandlestickSeries({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
+        upColor: '#88d693',
+        downColor: '#f04866',
         borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
+        wickUpColor: '#88d693',
+        wickDownColor: '#f04866',
         priceFormat: {
           type: 'custom',
           formatter: (price: number) => price.toFixed(6),
@@ -352,7 +341,7 @@ export class ChartService {
       });
 
       const volumeSeries = primaryChart.addHistogramSeries({
-        color: '#26a69a',
+        color: '#22ab94',
         priceFormat: { type: 'volume' },
         priceScaleId: ''
       });
@@ -364,7 +353,7 @@ export class ChartService {
         },
       });
 
-      console.log("Ready to draw RSI chart");
+      // RSI Chart
       const rsiChart = createChart(rsiElement, {
         ...getChartConfig(),
         width: chartWidth,
@@ -378,6 +367,24 @@ export class ChartService {
           },
         },
         localization: { locale: 'en-US' },
+      });
+
+      // Add a baseline series for RSI background shading
+      const rsiBackgroundSeries = rsiChart.addBaselineSeries({
+        baseValue: { type: 'price', price: 30 },
+        topLineColor: 'transparent',
+        bottomLineColor: 'transparent',
+        topFillColor1: '#1c1823',
+        topFillColor2: '#1c1823',
+        bottomFillColor1: 'transparent',
+        bottomFillColor2: 'transparent',
+        lineWidth: 1,
+      });
+
+      // Hide last value and price line from baseline
+      rsiBackgroundSeries.applyOptions({
+        lastValueVisible: false,
+        priceLineVisible: false,
       });
 
       const rsiSeries = rsiChart.addLineSeries({
@@ -396,7 +403,7 @@ export class ChartService {
         });
       });
 
-      console.log("Ready to draw MACD chart");
+      // MACD Chart
       const macdChart = createChart(macdElement, {
         ...getChartConfig(),
         width: chartWidth,
@@ -408,8 +415,6 @@ export class ChartService {
             top: 0.3,
             bottom: 0.25,
           },
-          // format: '{value}',
-          // precision: 8,
         },
         localization: { locale: 'en-US' },
       });
@@ -421,7 +426,7 @@ export class ChartService {
       });
 
       const signalLineSeries = macdChart.addLineSeries({
-        color: '#FF6B6B',
+        color: '#22ab94',
         lineWidth: 2,
         title: 'Signal',
       });
@@ -430,17 +435,26 @@ export class ChartService {
         title: 'Histogram',
       });
 
+      // Set chart data
       mainSeries.setData(chartData.data);
       volumeSeries.setData(chartData.data.map(item => ({
         time: item.time,
         value: item.volume,
         color: item.close >= item.open ? '#26a69a' : '#ef5350'
       })));
+
       rsiSeries.setData(chartData.rsi);
       macdLineSeries.setData(chartData.macd);
       signalLineSeries.setData(chartData.signal);
       histogramSeries.setData(chartData.histogram);
-      
+
+      // Set baseline series data for RSI shading (flat line at RSI=70)
+      const rsiBackgroundData = chartData.rsi.map(d => ({
+        time: d.time,
+        value: 70,
+      }));
+      rsiBackgroundSeries.setData(rsiBackgroundData);
+
       [primaryChart, rsiChart, macdChart].forEach(c => c.timeScale().fitContent());
       [primaryChart, rsiChart, macdChart].forEach((c, index) => {
         c.timeScale().subscribeVisibleTimeRangeChange(() => {
@@ -454,9 +468,10 @@ export class ChartService {
         });
       });
 
-      console.log("Completed drawing charts");
-
-      return [primaryChart, rsiChart, macdChart].map(chart => chart.takeScreenshot().toDataURL("image/png")).map(base64ToBuffer);
+      // Take screenshots of each chart and convert to buffers
+      return [primaryChart, rsiChart, macdChart]
+        .map(chart => chart.takeScreenshot().toDataURL("image/png"))
+        .map(base64ToBuffer);
     } catch (error: any) {
       const e: any = new Error(`Failed to generate chart: ${error.message}`);
       e.statusCode = 500;
@@ -485,7 +500,12 @@ export class ChartService {
     ];
     const lastChatData = chartData[chartData.length-1];
     const valueLabels = ['O:', 'H:', 'L:', 'C:'];
-    const valueTexts = [lastChatData.open.toFixed(8), lastChatData.high.toFixed(8), lastChatData.low.toFixed(8), lastChatData.close.toFixed(8)];
+    const valueTexts = [
+      lastChatData.open.toFixed(8), 
+      lastChatData.high.toFixed(8), 
+      lastChatData.low.toFixed(8), 
+      lastChatData.close.toFixed(8)
+    ];
   
     // Create a canvas to draw the text
     const canvas = createCanvas(width, height);
@@ -502,14 +522,10 @@ export class ChartService {
       context.fillText(texts[i], textX, textYs[i]);
     }
 
-    context.fillStyle = 'rgba(128, 84, 196, 0.1)';
-    context.fillRect(
-      Consts.CHART_PADDING_LEFT, 
-      tops[1] + 18, 
-      Consts.CHART_WIDTH - Consts.CHART_PADDING_LEFT - Consts.CHART_PADDING_RIGHT - Consts.CHART_RIGHT_PANEL_WIDTH, 
-      33
-    );
+    // Remove the static rectangle overlay logic previously used for RSI background
+    // No more context.fillStyle = 'rgba(128, 84, 196, 0.1)'; or fillRect here
 
+    // Adjust value label positions as needed
     const startX = texts[0].length * 7;
     const gap = 16;
     const valueWidth = valueTexts[0].length * 8;
@@ -538,18 +554,17 @@ export class ChartService {
       // Combine images vertically
       return await sharp({
         create: {
-          width: totalWidth,  // Set the width you want for the combined image
-          height: totalHeight,  // Total height (sum of all chart heights)
-          channels: 3,  // RGBA
+          width: totalWidth,
+          height: totalHeight,
+          channels: 3,
           background: { r: 19, g: 23, b: 34 }
         }
       })
       .composite(imagePaths.map((img: any, i: number) => ({
         input: img,
-        top: tops[i],  // Position each image vertically (adjust as needed)
+        top: tops[i],
         left: Consts.CHART_PADDING_LEFT,
       })));
-      // .toFile(outputPath);  // Save the combined image
     } catch (err) {
       console.error('Error combining images:', err);
     }
