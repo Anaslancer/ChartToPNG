@@ -69,7 +69,7 @@ export class ImageService {
     return finalImage;
   }
   
-  async combineImagesVertically(imagePaths: any/*, outputPath: string*/, width: number, height: number) {
+  async combineImagesVertically(imagePaths: any, width: number, height: number) {
     try {
       // Combine images vertically
       return await sharp({
