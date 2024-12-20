@@ -282,6 +282,7 @@ export class ChartService {
           rightPriceScale: {
             ...getChartConfig().rightPriceScale,
             // precision: 6,
+            minimumWidth: 70,
             mode: 0,
             autoScale: true,
             scaleMargins: {
@@ -327,6 +328,7 @@ export class ChartService {
         height: RSI_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
+          minimumWidth: 70,
           scaleMargins: {
             top: 0.1,
             bottom: 0.1,
@@ -347,6 +349,7 @@ export class ChartService {
         height: MACD_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
+          minimumWidth: 70,
           scaleMargins: {
             top: 0.3,
             bottom: 0.25,
@@ -383,9 +386,8 @@ export class ChartService {
       macdLineSeries.setData(chartData.macd);
       signalLineSeries.setData(chartData.signal);
       histogramSeries.setData(chartData.histogram);
-
+      
       [primaryChart, rsiChart, macdChart].forEach(c => c.timeScale().fitContent());
-
       [primaryChart, rsiChart, macdChart].forEach((c, index) => {
         c.timeScale().subscribeVisibleTimeRangeChange(() => {
           const timeRange = c.timeScale().getVisibleRange();
@@ -399,8 +401,6 @@ export class ChartService {
       });
 
       console.log("Completed drawing charts");
-
-      // await new Promise(resolve => setTimeout(resolve, 3500));
 
       return [primaryChart, rsiChart, macdChart].map(chart => chart.takeScreenshot().toDataURL("image/png")).map(base64ToBuffer);
     } catch (error: any) {
