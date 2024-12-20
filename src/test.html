@@ -1,0 +1,19 @@
+<div class="chart-container">
+  <div id="price_chart" class="chart-section">
+    <div class="chart-title">
+      ${tokenName} · ${timeframe}, GMGN.AI
+      <span class="price-info">
+        O: <span class="value">${chartData[chartData.length-1].open.toFixed(8)}</span>
+        H: <span class="value">${chartData[chartData.length-1].high.toFixed(8)}</span>
+        L: <span class="value">${chartData[chartData.length-1].low.toFixed(8)}</span>
+        C: <span class="value">${chartData[chartData.length-1].close.toFixed(8)}</span>
+      </span>
+    </div>
+  </div>
+  <div id="rsi_chart" class="chart-section">
+    <div class="chart-title">RSI (14)</div>
+  </div>
+  <div id="macd_chart" class="chart-section">
+    <div class="chart-title">MACD (12, 26, 9)</div>
+  </div>
+</div>

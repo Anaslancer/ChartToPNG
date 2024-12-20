@@ -1,24 +1,22 @@
-import { ChartService } from './chartService';
+import { TestChartService } from './testChartService';
+import { ImageService } from './imageCombineService';
 import { ohlcvData } from './ohlcvData';
 import * as fs from 'fs';
 import * as path from 'path';
 
 (async () => {
-  const service = new ChartService();
+  const chartService = new TestChartService();
+  const imageService = new ImageService();
 
-  // Token and Timeframe
+  // Token and TimeFrame
   const tokenName = 'HAT';
-  const timeframe = '1m';
+  const timeFrame = '1m';
 
   try {
     // Generate chart using OHLCV data
-    const chart = await service.generateChart(ohlcvData, tokenName, timeframe);
-
-    // Save chart to a file in the project root
+    const chartImages = await chartService.generateChart(ohlcvData, tokenName, timeFrame, 1200, 800);
     const outputPath = path.resolve(process.cwd(), 'output.png'); // Use project root
-    fs.writeFileSync(outputPath, chart);
-
-    console.log(`Chart generated: ${outputPath}`);
+    await imageService.combineImagesVertically(chartImages, outputPath, 1200, 800);
   } catch (error) {
     console.error('Error generating chart:', error);
   }
