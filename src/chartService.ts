@@ -510,15 +510,15 @@ export class ChartService {
       33
     );
 
-    const startX = 112;
+    const startX = texts[0].length * 7;
     const gap = 16;
-    const valueWidth = 84;
+    const valueWidth = valueTexts[0].length * 8;
 
     for (let i = 0; i < valueLabels.length; i ++) {
       context.fillStyle = fontColor;
-      context.fillText(valueLabels[i], textX + startX + (valueWidth * i), textYs[0]);
+      context.fillText(valueLabels[i], textX + startX + (valueWidth * i) + 4 * i, textYs[0]);
       context.fillStyle = Consts.TITLE_VALUE_FONT_COLOR;
-      context.fillText(valueTexts[i], textX + startX + gap + (valueWidth * i), textYs[0]);
+      context.fillText(valueTexts[i], textX + startX + gap + (valueWidth * i) + 4 * i, textYs[0]);
     }
 
     // Convert the canvas to a buffer
