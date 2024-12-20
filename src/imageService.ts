@@ -1,5 +1,5 @@
 import { createCanvas } from "canvas";
-import { CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_WIDTH, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, TITLE_FONT_COLOR, TITLE_FONT_FAMILY, TITLE_FONT_SIZE, TITLE_VALUE_FONT_COLOR } from "./consts";
+import { CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_PADDING_RIGHT, CHART_RIGHT_PANEL_WIDTH, CHART_WIDTH, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, TITLE_FONT_COLOR, TITLE_FONT_FAMILY, TITLE_FONT_SIZE, TITLE_VALUE_FONT_COLOR } from "./consts";
 
 const sharp = require('sharp');
 
@@ -45,6 +45,14 @@ export class ImageService {
       context.fillStyle = fontColor;
       context.fillText(texts[i], textX, textYs[i]);
     }
+
+    context.fillStyle = 'rgba(128, 84, 196, 0.1)';
+    context.fillRect(
+      CHART_PADDING_LEFT, 
+      tops[1] + 18, 
+      CHART_WIDTH - CHART_PADDING_LEFT - CHART_PADDING_RIGHT - CHART_RIGHT_PANEL_WIDTH, 
+      33
+    );
 
     const startX = 112;
     const gap = 16;

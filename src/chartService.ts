@@ -1,7 +1,7 @@
 const { JSDOM } = require('jsdom');
-import { createChart, HorzAlign, Time, VertAlign } from 'lightweight-charts';
+import { createChart, HorzAlign, LineStyle, Time, VertAlign } from 'lightweight-charts';
 import { OHLCV } from '../types';
-import { CHART_BACKGROUND_COLOR, CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_PADDING_RIGHT, CHART_TEXT_COLOR, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, WATER_MARK_FONT_FAMILY, WATER_MARK_TITLE } from './consts';
+import { CHART_BACKGROUND_COLOR, CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_PADDING_RIGHT, CHART_RIGHT_PANEL_WIDTH, CHART_TEXT_COLOR, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, WATER_MARK_FONT_FAMILY, WATER_MARK_TITLE } from './consts';
 
 export const getChatData = (data: OHLCV[]) => {
   // Sort and map incoming data
@@ -149,7 +149,7 @@ export const getChatData = (data: OHLCV[]) => {
 };
 
 export class ChartService {
-  async generateChart(data: OHLCV[], tokenName: string, timeFrame: string, width: number, height: number) {
+  async generateChart(data: OHLCV[], width: number, height: number) {
     try {
       const setSystemConfigure = (dom: any) => {
         const window = global.window = dom.window;
@@ -194,7 +194,7 @@ export class ChartService {
         global.document = dom.window.document;
       };
 
-      const createDom = (chartData: any, height: number) => {
+      const createDom = (height: number) => {
         return new JSDOM(
           `
             <!DOCTYPE html>
@@ -259,7 +259,7 @@ export class ChartService {
       };
 
       const chartData = getChatData(data);
-      const dom = createDom(chartData.data, height);
+      const dom = createDom(height);
       setSystemConfigure(dom);
 
       console.log("Created dom and set configuration");
@@ -282,7 +282,7 @@ export class ChartService {
           rightPriceScale: {
             ...getChartConfig().rightPriceScale,
             // precision: 6,
-            minimumWidth: 70,
+            minimumWidth: CHART_RIGHT_PANEL_WIDTH,
             mode: 0,
             autoScale: true,
             scaleMargins: {
@@ -328,7 +328,7 @@ export class ChartService {
         height: RSI_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
-          minimumWidth: 70,
+          minimumWidth: CHART_RIGHT_PANEL_WIDTH,
           scaleMargins: {
             top: 0.1,
             bottom: 0.1,
@@ -338,8 +338,19 @@ export class ChartService {
       });
 
       const rsiSeries = rsiChart.addLineSeries({
-        color: '#2962FF',
+        color: '#8054c4',
         lineWidth: 2,
+        priceLineVisible: false,
+      });
+
+      [30, 50, 70].forEach(v => {
+        rsiSeries.createPriceLine({
+          price: v,
+          color: '#8054c499',
+          axisLabelVisible: false,
+          lineWidth: 1,
+          lineStyle: LineStyle.LargeDashed,
+        });
       });
 
       console.log("Ready to draw MACD chart");
@@ -349,7 +360,7 @@ export class ChartService {
         height: MACD_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
-          minimumWidth: 70,
+          minimumWidth: CHART_RIGHT_PANEL_WIDTH,
           scaleMargins: {
             top: 0.3,
             bottom: 0.25,

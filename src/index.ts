@@ -19,7 +19,7 @@ const sharp = require('sharp');
 
   try {
     // Generate chart using OHLCV data
-    const chartImagesByBuffer = await chartService.generateChart(ohlcvData, tokenName, timeFrame, width, height);
+    const chartImagesByBuffer = await chartService.generateChart(ohlcvData, width, height);
     const outputPath = path.resolve(process.cwd(), 'output.png'); // Use project root
     const chartImage = await imageService.combineImagesVertically(chartImagesByBuffer, width, height);
     const finalImage = await imageService.addTextToImage(chartImage, getChatData(ohlcvData).data, tokenName, timeFrame, {});

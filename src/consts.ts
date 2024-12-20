@@ -10,6 +10,8 @@ export const CHART_PADDING_LEFT = 20;
 export const CHART_PADDING_RIGHT = 4;
 export const CHART_ITEM_GAP = 4;
 
+export const CHART_RIGHT_PANEL_WIDTH = 70;
+
 export const TITLE_FONT_SIZE = 12;
 export const TITLE_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif";
 export const TITLE_FONT_COLOR = '#787B86';
