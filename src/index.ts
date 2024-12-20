@@ -1,8 +1,9 @@
-import { TestChartService } from './testChartService';
+import { getChatData, TestChartService } from './testChartService';
 import { ImageService } from './imageCombineService';
 import { ohlcvData } from './ohlcvData';
-import * as fs from 'fs';
 import * as path from 'path';
+import { CHART_WIDTH, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT } from './consts';
+const sharp = require('sharp');
 
 (async () => {
   const chartService = new TestChartService();
@@ -12,11 +13,20 @@ import * as path from 'path';
   const tokenName = 'HAT';
   const timeFrame = '1m';
 
+  // Width and Height
+  const width = CHART_WIDTH;
+  const height = PRIMARY_CHART_HEIGHT + RSI_CHART_HEIGHT + MACD_CHART_HEIGHT;
+
   try {
     // Generate chart using OHLCV data
-    const chartImages = await chartService.generateChart(ohlcvData, tokenName, timeFrame, 1200, 800);
+    const chartImagesByBuffer = await chartService.generateChart(ohlcvData, tokenName, timeFrame, width, height);
     const outputPath = path.resolve(process.cwd(), 'output.png'); // Use project root
-    await imageService.combineImagesVertically(chartImages, outputPath, 1200, 800);
+    const chartImage = await imageService.combineImagesVertically(chartImagesByBuffer/*, outputPath*/, width, height);
+    console.log("type of chartImage", typeof(chartImage));
+    
+    const finalImage = await imageService.addTextToImage(chartImage, getChatData(ohlcvData).data, tokenName, timeFrame, {});
+    await sharp(finalImage).toFile(outputPath);
+    console.log("Generated the output.png");
   } catch (error) {
     console.error('Error generating chart:', error);
   }

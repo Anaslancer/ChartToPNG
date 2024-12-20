@@ -1,6 +1,152 @@
 const { JSDOM } = require('jsdom');
 import { createChart, HorzAlign, Time, VertAlign } from 'lightweight-charts';
 import { OHLCV } from '../types';
+import { CHART_BACKGROUND_COLOR, CHART_ITEM_GAP, CHART_PADDING_HEIGHT, CHART_PADDING_LEFT, CHART_PADDING_RIGHT, CHART_TEXT_COLOR, MACD_CHART_HEIGHT, PRIMARY_CHART_HEIGHT, RSI_CHART_HEIGHT, WATER_MARK_FONT_FAMILY, WATER_MARK_TITLE } from './consts';
+
+export const getChatData = (data: OHLCV[]) => {
+  // Sort and map incoming data
+  const chartData = data
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map(item => ({
+      time: item.timestamp as Time,  // Ensure this is a valid time (UTCTimestamp)
+      open: Number(item.open),
+      high: Number(item.high),
+      low: Number(item.low),
+      close: Number(item.close),
+      volume: Number(item.volume)
+    }));
+
+  // Compute RSI
+  function calculateRSI(data: { time: Time; close: number; }[], period = 14) {
+    const closes = data.map(d => d.close);
+    const gains: number[] = [];
+    const losses: number[] = [];
+    const rsiData: { time: Time; value: number }[] = [];
+
+    for (let i = 1; i < closes.length; i++) {
+      const diff = closes[i] - closes[i - 1];
+      gains.push(diff > 0 ? diff : 0);
+      losses.push(diff < 0 ? Math.abs(diff) : 0);
+    }
+
+    let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period;
+
+    for (let i = period; i < closes.length; i++) {
+      avgGain = ((avgGain * (period - 1)) + gains[i - 1]) / period;
+      avgLoss = ((avgLoss * (period - 1)) + losses[i - 1]) / period;
+
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      const rsi = 100 - (100 / (1 + rs));
+
+      rsiData.push({
+        time: data[i].time,
+        value: rsi
+      });
+    }
+
+    return rsiData;
+  }
+
+  // Compute MACD
+  function calculateMACD(data: { time: Time; close: number; }[], fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+    const scaledCloses = data.map(d => d.close);
+
+    function ema(values: number[], period: number) {
+      const k = 2 / (period + 1);
+      let emaVal = values[0];
+      const result = [emaVal];
+      for (let i = 1; i < values.length; i++) {
+        emaVal = values[i] * k + emaVal * (1 - k);
+        result.push(emaVal);
+      }
+      return result;
+    }
+
+    const slowEma = ema(scaledCloses, slowPeriod);
+    const fastEma = ema(scaledCloses, fastPeriod);
+
+    const macdLine: number[] = [];
+    for (let i = 0; i < slowEma.length; i++) {
+      if (fastEma[i] !== undefined) {
+        macdLine.push(fastEma[i] - slowEma[i]);
+      }
+    }
+
+    const signalLine = ema(macdLine.slice(slowPeriod - fastPeriod), signalPeriod); 
+    // Adjust indices if needed
+    // macdLine starts at index (slowPeriod - 1)
+    // We'll consider data from slowPeriod-1 to end for MACD
+
+    const start = slowPeriod - 1; // first MACD value index in original data
+    const macdData: { time: Time; value: number }[] = [];
+    const signalData: { time: Time; value: number }[] = [];
+    const histogramData: { time: Time; value: number; color: string }[] = [];
+
+    for (let i = start + signalPeriod; i < data.length; i++) {
+      const macdValue = macdLine[i - start];
+      const signalValue = signalLine[i - (start + signalPeriod)];
+      const hist = macdValue - signalValue;
+
+      macdData.push({ time: data[i].time, value: macdValue });
+      signalData.push({ time: data[i].time, value: signalValue });
+      histogramData.push({
+        time: data[i].time,
+        value: hist,
+        color: hist >= 0 ? '#26a69a' : '#ef5350',
+      });
+    }
+
+    return { macdData, signalData, histogramData };
+  }
+
+  const rsiData = calculateRSI(chartData);
+  const macdResults = calculateMACD(chartData);
+
+  // Align all data sets by time
+  const fullTimeArray = chartData.map(d => d.time);
+
+  // Convert RSI, MACD, Signal, Histogram into maps for quick lookup
+  const rsiMap = new Map(rsiData.map(d => [d.time, d.value]));
+
+  const macdMap = new Map(macdResults.macdData.map(d => [d.time, d.value]));
+  const signalMap = new Map(macdResults.signalData.map(d => [d.time, d.value]));
+  const histMap = new Map(macdResults.histogramData.map(d => [d.time, { value: d.value, color: d.color }]));
+
+  const alignedRsiData = fullTimeArray.map(t => {
+    if (rsiMap.has(t)) {
+      return { time: t, value: rsiMap.get(t)! };
+    } else {
+      // Whitespace if RSI not available at this time
+      return { time: t };
+    }
+  });
+
+  const alignedMacdData = fullTimeArray.map(t => {
+    return { time: t, value: macdMap.has(t) ? macdMap.get(t)! : NaN };
+  });
+
+  const alignedSignalData = fullTimeArray.map(t => {
+    return { time: t, value: signalMap.has(t) ? signalMap.get(t)! : NaN };
+  });
+
+  const alignedHistogramData = fullTimeArray.map(t => {
+    if (histMap.has(t)) {
+      const entry = histMap.get(t)!;
+      return { time: t, value: entry.value, color: entry.color };
+    } else {
+      return { time: t, value: NaN };
+    }
+  });
+
+  return {
+    data: chartData,
+    rsi: alignedRsiData,
+    macd: alignedMacdData,
+    signal: alignedSignalData,
+    histogram: alignedHistogramData
+  };
+};
 
 export class TestChartService {
   async generateChart(data: OHLCV[], tokenName: string, timeFrame: string, width: number, height: number) {
@@ -54,21 +200,10 @@ export class TestChartService {
             <!DOCTYPE html>
             <div style="height: ${height}px;" id="ChatContainer">
               <div id="price_chart" class="chart-section">
-                <div class="chart-title">
-                  ${tokenName} · ${timeFrame}, GMGN.AI
-                  <span class="price-info">
-                    O: <span class="value">${chartData[chartData.length-1].open.toFixed(8)}</span>
-                    H: <span class="value">${chartData[chartData.length-1].high.toFixed(8)}</span>
-                    L: <span class="value">${chartData[chartData.length-1].low.toFixed(8)}</span>
-                    C: <span class="value">${chartData[chartData.length-1].close.toFixed(8)}</span>
-                  </span>
-                </div>
               </div>
               <div id="rsi_chart" class="chart-section">
-                <div class="chart-title">RSI (14)</div>
               </div>
               <div id="macd_chart" class="chart-section">
-                <div class="chart-title">MACD (12, 26, 9)</div>
               </div>
             </div>
           `, 
@@ -79,156 +214,11 @@ export class TestChartService {
         );
       };
 
-      const getChatData = (data: OHLCV[]) => {
-        // Sort and map incoming data
-        const chartData = data
-          .sort((a, b) => a.timestamp - b.timestamp)
-          .map(item => ({
-            time: item.timestamp as Time,  // Ensure this is a valid time (UTCTimestamp)
-            open: Number(item.open),
-            high: Number(item.high),
-            low: Number(item.low),
-            close: Number(item.close),
-            volume: Number(item.volume)
-          }));
-
-        // Compute RSI
-        function calculateRSI(data: { time: Time; close: number; }[], period = 14) {
-          const closes = data.map(d => d.close);
-          const gains: number[] = [];
-          const losses: number[] = [];
-          const rsiData: { time: Time; value: number }[] = [];
-
-          for (let i = 1; i < closes.length; i++) {
-            const diff = closes[i] - closes[i - 1];
-            gains.push(diff > 0 ? diff : 0);
-            losses.push(diff < 0 ? Math.abs(diff) : 0);
-          }
-
-          let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period;
-          let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period;
-
-          for (let i = period; i < closes.length; i++) {
-            avgGain = ((avgGain * (period - 1)) + gains[i - 1]) / period;
-            avgLoss = ((avgLoss * (period - 1)) + losses[i - 1]) / period;
-
-            const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-            const rsi = 100 - (100 / (1 + rs));
-
-            rsiData.push({
-              time: data[i].time,
-              value: rsi
-            });
-          }
-
-          return rsiData;
-        }
-
-        // Compute MACD
-        function calculateMACD(data: { time: Time; close: number; }[], fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-          const scaledCloses = data.map(d => d.close);
-
-          function ema(values: number[], period: number) {
-            const k = 2 / (period + 1);
-            let emaVal = values[0];
-            const result = [emaVal];
-            for (let i = 1; i < values.length; i++) {
-              emaVal = values[i] * k + emaVal * (1 - k);
-              result.push(emaVal);
-            }
-            return result;
-          }
-
-          const slowEma = ema(scaledCloses, slowPeriod);
-          const fastEma = ema(scaledCloses, fastPeriod);
-
-          const macdLine: number[] = [];
-          for (let i = 0; i < slowEma.length; i++) {
-            if (fastEma[i] !== undefined) {
-              macdLine.push(fastEma[i] - slowEma[i]);
-            }
-          }
-
-          const signalLine = ema(macdLine.slice(slowPeriod - fastPeriod), signalPeriod); 
-          // Adjust indices if needed
-          // macdLine starts at index (slowPeriod - 1)
-          // We'll consider data from slowPeriod-1 to end for MACD
-
-          const start = slowPeriod - 1; // first MACD value index in original data
-          const macdData: { time: Time; value: number }[] = [];
-          const signalData: { time: Time; value: number }[] = [];
-          const histogramData: { time: Time; value: number; color: string }[] = [];
-
-          for (let i = start + signalPeriod; i < data.length; i++) {
-            const macdValue = macdLine[i - start];
-            const signalValue = signalLine[i - (start + signalPeriod)];
-            const hist = macdValue - signalValue;
-
-            macdData.push({ time: data[i].time, value: macdValue });
-            signalData.push({ time: data[i].time, value: signalValue });
-            histogramData.push({
-              time: data[i].time,
-              value: hist,
-              color: hist >= 0 ? '#26a69a' : '#ef5350',
-            });
-          }
-
-          return { macdData, signalData, histogramData };
-        }
-
-        const rsiData = calculateRSI(chartData);
-        const macdResults = calculateMACD(chartData);
-
-        // Align all data sets by time
-        const fullTimeArray = chartData.map(d => d.time);
-
-        // Convert RSI, MACD, Signal, Histogram into maps for quick lookup
-        const rsiMap = new Map(rsiData.map(d => [d.time, d.value]));
-
-        const macdMap = new Map(macdResults.macdData.map(d => [d.time, d.value]));
-        const signalMap = new Map(macdResults.signalData.map(d => [d.time, d.value]));
-        const histMap = new Map(macdResults.histogramData.map(d => [d.time, { value: d.value, color: d.color }]));
-
-        const alignedRsiData = fullTimeArray.map(t => {
-          if (rsiMap.has(t)) {
-            return { time: t, value: rsiMap.get(t)! };
-          } else {
-            // Whitespace if RSI not available at this time
-            return { time: t };
-          }
-        });
-
-        const alignedMacdData = fullTimeArray.map(t => {
-          return { time: t, value: macdMap.has(t) ? macdMap.get(t)! : NaN };
-        });
-
-        const alignedSignalData = fullTimeArray.map(t => {
-          return { time: t, value: signalMap.has(t) ? signalMap.get(t)! : NaN };
-        });
-
-        const alignedHistogramData = fullTimeArray.map(t => {
-          if (histMap.has(t)) {
-            const entry = histMap.get(t)!;
-            return { time: t, value: entry.value, color: entry.color };
-          } else {
-            return { time: t, value: NaN };
-          }
-        });
-
-        return {
-          data: chartData,
-          rsi: alignedRsiData,
-          macd: alignedMacdData,
-          signal: alignedSignalData,
-          histogram: alignedHistogramData
-        };
-      };
-
       const getChartConfig = () => (
         {
           layout: {
-            background: { color: '#131722' },
-            textColor: '#d1d4dc',
+            background: { color: CHART_BACKGROUND_COLOR },
+            textColor: CHART_TEXT_COLOR,
           },
           grid: {
             vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
@@ -253,13 +243,13 @@ export class TestChartService {
 
       const getChartWaterMark = () => (
         {
-          text: '@CHAT_AS_PNG',
+          text: WATER_MARK_TITLE,
           visible: true,
           fontSize: 48,
           horzAlign: 'center' as HorzAlign,
           vertAlign: 'center' as VertAlign,
           color: 'rgba(255, 255, 255, 0.1)',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif',
+          fontFamily: WATER_MARK_FONT_FAMILY,
         }
       );
 
@@ -286,8 +276,8 @@ export class TestChartService {
         chartElement, 
         {
           ...getChartConfig(),
-          width,
-          height: 600, 
+          width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
+          height: PRIMARY_CHART_HEIGHT - CHART_PADDING_HEIGHT - (CHART_ITEM_GAP / 2), 
           watermark: getChartWaterMark(),
           rightPriceScale: {
             ...getChartConfig().rightPriceScale,
@@ -333,8 +323,8 @@ export class TestChartService {
       console.log("Ready to draw RSI chart");
       const rsiChart = createChart(rsiElement, {
         ...getChartConfig(),
-        width,
-        height: 100,
+        width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
+        height: RSI_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
           scaleMargins: {
@@ -353,8 +343,8 @@ export class TestChartService {
       console.log("Ready to draw MACD chart");
       const macdChart = createChart(macdElement, {
         ...getChartConfig(),
-        width,
-        height: 100,
+        width: width - CHART_PADDING_LEFT - CHART_PADDING_RIGHT,
+        height: MACD_CHART_HEIGHT - CHART_ITEM_GAP,
         rightPriceScale: {
           ...getChartConfig().rightPriceScale,
           scaleMargins: {
@@ -410,7 +400,7 @@ export class TestChartService {
 
       console.log("Completed drawing charts");
 
-      await new Promise(resolve => setTimeout(resolve, 3500));
+      // await new Promise(resolve => setTimeout(resolve, 3500));
 
       return [primaryChart, rsiChart, macdChart].map(chart => chart.takeScreenshot().toDataURL("image/png")).map(base64ToBuffer);
     } catch (error: any) {
