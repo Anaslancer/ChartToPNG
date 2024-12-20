@@ -185,7 +185,14 @@ export const getChatData = (data: OHLCV[]) => {
 };
 
 export class ChartService {
-  async generateChart(data: OHLCV[]) {
+  async generateChart(data: OHLCV[], tokenName: string, timeFrame: string) {
+    const chartImagesByBuffer = await this.generateChartImage(data);
+    const chartImage = await this.combineImagesVertically(chartImagesByBuffer);
+    const finalImage = await this.addTextToImage(chartImage, getChatData(data).data, tokenName, timeFrame, {});
+    return finalImage;
+  }
+
+  async generateChartImage(data: OHLCV[]) {
     try {
       const setSystemConfigure = (dom: any) => {
         const window = global.window = dom.window;
